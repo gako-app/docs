@@ -1,0 +1,77 @@
+site_name: Gako
+site_description: >-
+  Zero-knowledge secret management. The server that stores your secrets
+  cannot read them — by design, not by promise.
+site_url: https://docs.gako.app/
+copyright: Copyright &copy; Gako contributors
+
+# The Gako source repo is currently private; once it is public, point this at
+# https://github.com/gako-app/gako and enable the repo link in the header.
+# repo_url: https://github.com/gako-app/gako
+# repo_name: gako-app/gako
+
+theme:
+  name: material
+  language: en
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.footer
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Concepts:
+      - Zero-knowledge model: concepts/zero-knowledge.md
+      - Architecture: concepts/architecture.md
+  - Installation: install/index.md
+  - Administration: admin/index.md
+  - Clients:
+      - Web client: clients/web.md
+      - CLI client: clients/cli.md
+  - Features: features/index.md
+  - Security: security/index.md

@@ -1,0 +1,17 @@
+/* Gako brand palette — mirrors the colors used on https://gako.app/ */
+
+:root {
+  --md-primary-fg-color:        #2270c8; /* brand blue */
+  --md-primary-fg-color--light: #3b82f6;
+  --md-primary-fg-color--dark:  #1d4ed8;
+  --md-accent-fg-color:         #3d9b46; /* brand green */
+  --md-accent-fg-color--transparent: #3d9b461a;
+}
+
+/* Keep the brand colors in dark mode too. */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        #2270c8;
+  --md-primary-fg-color--light: #3b82f6;
+  --md-primary-fg-color--dark:  #1d4ed8;
+  --md-accent-fg-color:         #10b981;
+}
