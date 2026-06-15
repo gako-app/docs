@@ -11,7 +11,8 @@ server can stay ignorant of secret content.
 | **Core** | The canonical client crypto/sync logic. One implementation (Go), also compiled to WebAssembly for the browser, so every client enforces identical formats. |
 | **Server** | Stores and serves opaque ciphertext, access policy, and signatures over an HTTP API. Also serves the web client. Needs only a data directory. |
 | **Web client** | The core compiled to WASM, running in the browser. Encrypts and decrypts locally; the server never sees plaintext. |
-| **CLI client** | A command-line client sharing the same core, for scripting, automation, and machine identities. |
+| **CLI client** | A command-line client sharing the same core, for scripting, automation, machine identities, and administration. |
+| **Future clients** | Native **desktop** and **mobile** clients and **browser extensions** are planned. Each will embed the same core, so they enforce identical formats and sit on the same trusted side of the boundary as today's clients. |
 
 ## The trust boundary
 
@@ -19,26 +20,28 @@ The line that matters runs between the **clients** (trusted with plaintext and
 keys) and the **server** (trusted only to store and serve ciphertext, and to
 enforce policy honestly).
 
+```mermaid
+flowchart TB
+    subgraph trusted["Clients — trusted with plaintext and keys"]
+        direction LR
+        web["Web client<br>(WASM core)"]
+        cli["CLI client<br>(core)"]
+        future["Future clients<br>desktop · mobile · extensions"]
+    end
+
+    subgraph untrusted["Server side — trusted only to store ciphertext and enforce policy"]
+        direction TB
+        server["Server"]
+        data[("Data directory")]
+        server --- data
+    end
+
+    trusted -->|"opaque ciphertext + policy + signatures<br>plaintext never crosses this line"| server
 ```
-   ┌─────────────┐        ┌─────────────┐        ┌─────────────┐
-   │  Web client │        │ CLI client  │        │  Other apps │
-   │  (WASM core)│        │   (core)    │        │  (core)     │
-   └──────┬──────┘        └──────┬──────┘        └──────┬──────┘
-          │  plaintext stays on this side of the line   │
-   ───────┼──────────────────────┼─────────────────────┼────────
-          │      opaque ciphertext + policy + signatures│
-          └──────────────────────┴─────────────────────┘
-                                  │
-                          ┌───────┴────────┐
-                          │     Server     │
-                          │ ciphertext +   │
-                          │ policy store   │
-                          └───────┬────────┘
-                                  │
-                          ┌───────┴────────┐
-                          │  Data directory │
-                          └────────────────┘
-```
+
+Everything above the line holds keys and sees plaintext; everything below it
+sees only ciphertext. The server stores and serves what the clients hand it and
+enforces access policy, but it never receives the keys to read any of it.
 
 Because the core is shared, a secret written by the web client is readable by
 the CLI and vice versa — the formats are defined once and verified against a

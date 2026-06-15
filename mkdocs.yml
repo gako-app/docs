@@ -5,6 +5,14 @@ site_description: >-
 site_url: https://docs.gako.app/
 copyright: Copyright &copy; Gako contributors
 
+# With `mkdocs build --strict`, these turn broken internal links and anchors
+# into build failures (CI runs --strict).
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
 # The Gako source repo is currently private; once it is public, point this at
 # https://github.com/gako-app/gako and enable the repo link in the header.
 # repo_url: https://github.com/gako-app/gako
@@ -54,7 +62,11 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.tabbed:
@@ -68,10 +80,10 @@ nav:
   - Concepts:
       - Zero-knowledge model: concepts/zero-knowledge.md
       - Architecture: concepts/architecture.md
+  - Security: security/index.md
   - Installation: install/index.md
   - Administration: admin/index.md
   - Clients:
       - Web client: clients/web.md
       - CLI client: clients/cli.md
   - Features: features/index.md
-  - Security: security/index.md

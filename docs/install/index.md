@@ -20,12 +20,12 @@ administrator and stores the first secret.
 |---|---|---|
 | **Go** | 1.26.4 or newer | Builds the server, the CLI, and the WebAssembly core. The module sets `go 1.26.4`; an older toolchain will refuse to build. |
 | **Node.js** | Current LTS (verified with 26.x) | Only needed to build the **web client**. The server and CLI build with Go alone. |
-| **A C compiler** | — | Not required. The build is **pure Go, no cgo**, so the result is a self-contained static binary. |
 
-Supported build/run platforms are Linux and macOS (the project is developed and
-tested on both). Because there is no cgo, the server cross-compiles to other
-`GOOS`/`GOARCH` targets in the usual Go way; only Linux and macOS are exercised
-today.
+The build is pure Go (no cgo), so the result is a self-contained static binary
+with no runtime dependencies. Supported build/run platforms are Linux and macOS
+(the project is developed and tested on both); the server also cross-compiles to
+other `GOOS`/`GOARCH` targets in the usual Go way, though only Linux and macOS
+are exercised today.
 
 Check your toolchain:
 
@@ -73,17 +73,31 @@ want the browser UI: its output is embedded into the server binary at
     # 3. CLI — the admin and automation client (see Administration).
     cd clients/cli
     go build -o gako .
-    cd ..
+    cd ../..
     ```
+
+    You end back at the repository root, with the binaries at
+    `server/gako-server` and `clients/cli/gako`.
 
 === "API-only (skip the web client)"
 
     ```sh
     # The web build is optional. With no build embedded, the server runs
     # API-only and logs "no web client embedded in this binary".
-    cd server && go build -o gako-server ./cmd/gako-server && cd ..
-    cd clients/cli && go build -o gako . && cd ..
+
+    # 1. Server — runs API-only with no web build embedded.
+    cd server
+    go build -o gako-server ./cmd/gako-server
+    cd ..
+
+    # 2. CLI — the admin and automation client (see Administration).
+    cd clients/cli
+    go build -o gako .
+    cd ../..
     ```
+
+    You end back at the repository root, with the binaries at
+    `server/gako-server` and `clients/cli/gako`.
 
 `npm run build` rebuilds the WASM core, bundles the Svelte app, and runs a
 post-build step that adds Subresource Integrity hashes and a hash manifest. It
@@ -98,18 +112,45 @@ rebuild the server to re-embed it.
     dependency — you can always add the UI later by building the web client and
     rebuilding the server.
 
-## Run the server
+## Put the binaries on your PATH
+
+The build leaves `gako-server` and `gako` in their module directories. Until
+Gako has proper packaging, the simplest way to run them from anywhere — without
+typing full paths — is to add those two directories to your `PATH`. From the
+repository root:
 
 ```sh
-./gako-server --listen 127.0.0.1:8347 --data-dir ./data
+export PATH="$PWD/server:$PWD/clients/cli:$PATH"
 ```
 
-On start it creates the data directory if needed, opens its database, and logs
-(structured JSON, to stderr):
+That lasts for the current shell only. To make it stick, add the same line (with
+the path spelled out absolutely, not `$PWD`) to your shell profile —
+`~/.profile`, `~/.zshrc`, or equivalent. The rest of this guide assumes both
+commands are on your `PATH`; if you would rather not change it, run them by full
+path instead (`./server/gako-server …`, `./clients/cli/gako …`).
+
+!!! note "This is a stopgap"
+    Editing `PATH` by hand is a development convenience. Packaged releases
+    (tagged binaries, container images, system packages) will install the
+    commands onto the `PATH` for you; none exist yet.
+
+## Run the server
+
+Pick a directory for the server's state and point `--data-dir` at it. A clearly
+named path such as `gako-data` makes it obvious what the directory is, wherever
+you run the command from:
+
+```sh
+gako-server --listen 127.0.0.1:8347 --data-dir ./gako-data
+```
+
+On start it creates the data directory if needed (here, `gako-data` in the
+current directory — use an absolute path like `/var/lib/gako/data` to place it
+deliberately), opens its database, and logs (structured JSON, to stderr):
 
 ```json
 {"level":"INFO","msg":"serving embedded web client"}
-{"level":"INFO","msg":"gako server listening","addr":"127.0.0.1:8347","data":"./data"}
+{"level":"INFO","msg":"gako server listening","addr":"127.0.0.1:8347","data":"./gako-data"}
 ```
 
 If you built API-only, the first line reads `no web client embedded in this
@@ -123,7 +164,7 @@ configure the server without changing its invocation.
 | Flag | Env | Default | Meaning |
 |---|---|---|---|
 | `--listen` | `GAKO_LISTEN` | `:8347` | Address the HTTP server binds. Use `127.0.0.1:8347` to accept only local connections (recommended behind a reverse proxy). |
-| `--data-dir` | `GAKO_DATA_DIR` | `./data` | Directory holding the database — the entire server state. Created (mode `0700`) if absent. |
+| `--data-dir` | `GAKO_DATA_DIR` | `./data` | Directory holding the database — the entire server state. Created (mode `0700`) if absent. This guide's examples pass an explicit `./gako-data` for clarity. |
 | `--debug` | — | `false` | Verbose (`DEBUG`-level) logging. Off by default. |
 
 The server stops cleanly on `SIGINT`/`SIGTERM`, finishing in-flight requests
@@ -159,7 +200,7 @@ The recommended shape is a TLS-terminating reverse proxy in front of a server
 bound to localhost:
 
 ```sh
-./gako-server --listen 127.0.0.1:8347 --data-dir /var/lib/gako/data
+gako-server --listen 127.0.0.1:8347 --data-dir /var/lib/gako/data
 ```
 
 === "Caddy"

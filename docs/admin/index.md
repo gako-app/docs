@@ -42,11 +42,42 @@ URL to your instance (e.g. `https://gako.example.com`).
 
 ## Bootstrapping the first administrator
 
-Before organizations exist there is no trust root to certify admin keys, so the
-first admin is rooted in **you, the operator** — the party who already holds the
-data directory. The ceremony has three moves: the user registers an account, you
-mint a single-use elevation token against the data directory, and the user
-redeems it from an installed client.
+A fresh instance has no administrators and, deliberately, no built-in one to
+fall back on. So where does the *first* admin's authority come from? Not from the
+server — the server holds no keys and certifies no one. It comes from **you, the
+operator**, because you already hold the one thing more privileged than any API
+credential: filesystem access to the **data directory**. Bootstrapping is the act
+of carrying that filesystem-level trust across into an API-level admin credential,
+exactly once, for one account.
+
+That hand-off is a single-use **elevation token**. It exists so the two halves of
+the ceremony can happen on different machines and at different times: the future
+admin registers and enrolls from their own client (where their keys live), while
+you mint the token on the server host (where the data directory lives). The token
+is the bridge between them — minting it requires the data directory; redeeming it
+enrolls the admin key.
+
+The ceremony has three moves, across three roles:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Future admin
+    actor Op as Operator
+    participant S as Server
+
+    U->>S: gako register — account created, keys generated locally
+    S-->>U: one-time recovery code
+    Note over Op: holds the data directory
+    Op->>Op: gako-server enroll-admin — mint single-use token<br>against the data directory, only its hash is stored
+    Op-->>U: convey the token out of band
+    U->>S: gako admin init --token — register the admin public key
+    Note over U: admin private key is sealed locally under the<br>master password and never leaves the machine
+```
+
+If you are both the operator and the first admin — the common single-person
+case — you play all three roles yourself: register, mint, redeem. The steps below
+walk through each move.
 
 ### 1. Register the account
 
@@ -85,7 +116,7 @@ On the server host, with access to the data directory, mint a single-use token
 that authorizes **one** admin enrollment for that account:
 
 ```sh
-gako-server enroll-admin --data-dir ./data --email admin@example.com
+gako-server enroll-admin --data-dir ./gako-data --email admin@example.com
 ```
 
 ```
@@ -118,6 +149,11 @@ Admin credential enrolled and sealed under your master password.
 Admin commands will ask for the password again — that is by design.
 3b00b72a-f479-4944-9e43-eedbde996b63
 ```
+
+That last line is the new credential's ID. `gako` prints machine-readable
+identifiers to stdout and the human-readable confirmation to stderr, so the bare
+UUID is what a script would capture; it is the same ID that `admin list` reports
+next.
 
 ### 4. Confirm
 
@@ -176,11 +212,10 @@ fingerprint shown by `gako status` is the user's public-key fingerprint, used
 for out-of-band verification when sharing.
 
 !!! note "Draft — human-account lifecycle"
-    Suspending or deleting a *human* account, and team membership generally,
-    belong to the organization layer (Design Phase 4) and are not yet exposed as
-    standalone operator commands. Today's instance-level identity management is
-    admin credentials and machine identities, both covered here. This page will
-    grow a Users/Org section as those workflows are exercised.
+    Suspending or deleting a *human* account is not yet exposed as a standalone
+    operator command; today's instance-level identity management is admin
+    credentials and machine identities, both covered here. Team membership lives
+    a layer up — see [Organizations](#organizations) below.
 
 ## Machine identities for automation
 
@@ -248,9 +283,10 @@ process before the command starts.
 gako machine revoke backup-runner
 ```
 
-Revocation is admin-signed and immediate: every session dies, every envelope is
-deleted, challenge login is refused, and secrets the machine had read are
-flagged for rotation. One identity per machine keeps this surgical — it is the
+Revocation is admin-signed and immediate: every session dies, every **envelope**
+— the per-recipient record that wraps a secret's key to one identity, so deleting
+it removes that identity's access — is deleted, challenge login is refused, and
+secrets the machine had read are flagged for rotation. One identity per machine keeps this surgical — it is the
 complete, cheap remedy for a leaked credential file.
 
 !!! warning "Secret zero"
@@ -270,7 +306,7 @@ email factor — the reference server has no mail transport, so you mint and rel
 the challenge after verifying the requester's identity out of band.
 
 ```sh
-gako-server recovery-challenge --data-dir ./data --email admin@example.com
+gako-server recovery-challenge --data-dir ./gako-data --email admin@example.com
 ```
 
 ```
@@ -295,11 +331,12 @@ reaches the server, so the server alone — or an operator who only ever sees
 hashes — cannot recover an account. Losing **both** the master password and the
 recovery code is permanent loss of that vault, by design.
 
-!!! note "Draft — organization recovery"
-    Organizations add a second recovery path: an offline org recovery identity
-    that can recover orphaned *org* secrets (it does not cover personal vaults).
-    That ceremony is part of the organization layer (Phase 4) and will be
-    documented alongside the rest of org administration.
+!!! note "Organization recovery is separate"
+    The recovery above is for a *personal* account. Organizations add a second,
+    independent path: an offline org recovery identity that can recover orphaned
+    *org* secrets (it does not cover personal vaults), driven by
+    `gako org recovery` / `gako org recover`. See
+    [Organizations](#organizations) below.
 
 ## Backups and restore
 
@@ -334,7 +371,7 @@ sqlite3 /var/lib/gako/data/gako.db ".backup '/backups/gako-$(date +%F).db'"
 directory, and start the server pointed at it:
 
 ```sh
-./gako-server --data-dir /var/lib/gako/restored
+gako-server --data-dir /var/lib/gako/restored
 ```
 
 !!! warning "Restoring an old snapshot can look like rollback"
@@ -346,14 +383,108 @@ directory, and start the server pointed at it:
     a lost instance, not for casually rewinding a live one; expect clients that
     had newer state to flag the mismatch until they reconcile.
 
+## Organizations
+
+Everything above gets a single operator to a working instance with users and
+machine identities. **Organizations** are the next layer up: a shared trust root,
+certified memberships, role-based authority, and shared collections of secrets
+for a team. They are implemented today in the `gako` CLI — which is the
+org-administration vehicle until a desktop client exists — and are the newest,
+still-settling part of the product, so treat this as an orientation rather than a
+complete reference.
+
+### The org trust root
+
+An organization is anchored by its own **root signing key**, generated locally
+when the org is created and the org's identity from then on. This is what keeps
+organizations zero-knowledge end to end, even from the server: members pin the
+root **from the invite they receive**, never from the server, then verify every
+membership certificate against that pinned root. A server that tried to swap an
+org's root — to slip in a member it controls — is caught the instant a client's
+pinned root disagrees with what the server serves (`gako org list` flags it
+loudly as a `MISMATCH`).
+
+Authority flows as a depth-two certificate chain: the **root** certifies admins,
+and **admins** certify ordinary members after verifying their key fingerprint out
+of band. The root's private half is written to an artifact file exactly once at
+creation; move it to offline custody (print it, a safe, an HSM) and delete the
+file. It is needed only to certify *new admins* — everyday onboarding uses an
+admin's own identity key, so the root stays offline almost always.
+
+### Roles
+
+Roles gate **authority** — who may grant, write, and administer — not who can
+read; revoking a role does not retract envelopes a member already holds (use
+removal for that). A member is invited with a role and can be moved later with
+`gako org role`.
+
+| Role | Authority |
+|---|---|
+| `owner` | The founder. Full authority; cannot be assigned or removed (no ownership transfer yet). |
+| `admin` | Full org administration: invite, certify, manage groups and collections, change roles, remove members. |
+| `granter` | Files secrets into collections and fulfils access grants; cannot change membership or structure. |
+| `member` | Reads the secrets shared to them through the org's collections. |
+| `read_only` | Like a member, and cannot be granted write authority. |
+
+### Lifecycle
+
+The founder runs the trust-root ceremony, invites people, and certifies them as
+they join. Invites and certifications are admin-tier (they prompt for the master
+password, like every admin operation); the join happens on the invitee's client.
+
+```sh
+# Found the org — runs the trust-root ceremony and writes the offline
+# root artifact once. You become its first certification authority.
+gako org create acme
+
+# Invite by account email; --role sets their authority (default: member).
+# The printed code carries the org id and trust root — send it over a
+# channel you trust, because the invite channel IS the verification channel.
+gako org invite acme dev@example.com --role member
+
+# The invited side accepts and PINS THE ROOT from the invite code, not the
+# server. They confirm the displayed fingerprint with you out of band.
+gako org join <invite-code>
+
+# After verifying their key fingerprint out of band, certify them in.
+# Certification IS the verification record — other members' clients accept
+# their material only once this chain exists.
+gako org certify acme dev@example.com
+
+# Inspect membership, chain-verified against your pinned root.
+gako org show acme
+gako org list                # your memberships, each with its root-pin status
+```
+
+!!! note "Certifying another admin needs the root"
+    Certifying an ordinary member uses your own identity key. Certifying someone
+    as a *new admin* — a key that must itself carry certification authority —
+    needs the offline root artifact: `gako org certify acme dev@example.com
+    --root acme.gako-org-root.json`. That is the only routine reason to bring the
+    root back out of custody.
+
+### Beyond the core lifecycle
+
+The CLI carries the rest of the org surface, all admin- or granter-tier:
+
+| Area | Commands |
+|---|---|
+| **Collections** — named sets of secrets shared as a unit | `gako org collection create / list / add / remove / grant / ungrant` |
+| **Groups** — named sets of members, grantable to collections | `gako org group create / list / add / remove / grant / ungrant` |
+| **Membership** — role changes and removal | `gako org role`, `gako org remove` |
+| **Hygiene** — exposure worklist and audit view | `gako org exposure`, `gako org audit` |
+| **Org recovery** — recover orphaned *org* secrets (not personal vaults) | `gako org recovery init / rotate`, `gako org recover` |
+
+Each of these deserves its own walkthrough; those will land here as the workflows
+are exercised. Run any command with `--help` for its current flags in the
+meantime.
+
 ## Beyond this guide
 
-This page reaches a usable single-operator (or small-team-with-machines)
-instance. Larger deployments add organizations — collections, groups, roles,
-certified onboarding, and org-scoped recovery — which are the Phase-4 surface and
-not required to run and test an instance. The CLI already carries the `gako org`
-commands; their operator documentation will land here as those workflows are
-exercised.
+This page reaches a usable single-operator, small-team, or organization-backed
+instance. The organization commands above are functional today but still
+maturing, and full deployments will want the per-area walkthroughs noted there
+once they are written.
 
 ## Related
 

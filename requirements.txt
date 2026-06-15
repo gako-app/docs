@@ -1,3 +1,6 @@
-# Pinned so local builds and CI render identically.
-# Bump deliberately, not automatically.
+# Constrained to known-compatible major versions — not exact-pinned, so a fresh
+# install picks up the latest matching release. Bump the bounds deliberately.
+# For byte-identical reproducible builds, replace these with exact pins or a
+# lockfile.
 mkdocs-material>=9.5,<10
+mkdocs<2  # MkDocs 2.0 is a breaking rewrite; stay on 1.x until it's verified.

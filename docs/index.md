@@ -16,21 +16,10 @@ reveals no secret content.
 
 ## Where to start
 
+These follow the order of the pages that come after — start at the top if Gako
+is new to you.
+
 <div class="grid cards" markdown>
-
--   :material-account: __End users__
-
-    Store and retrieve secrets through the web or command line.
-
-    [:octicons-arrow-right-24: Web client](clients/web.md) ·
-    [CLI client](clients/cli.md)
-
--   :material-server: __Administrators__
-
-    Self-host Gako for yourself or a team.
-
-    [:octicons-arrow-right-24: Installation](install/index.md) ·
-    [Administration](admin/index.md)
 
 -   :material-lock: __Understand the guarantee__
 
@@ -44,6 +33,21 @@ reveals no secret content.
 
     [:octicons-arrow-right-24: Security](security/index.md)
 
+-   :material-server: __Administrators__
+
+    Self-host Gako for yourself or a team. Administration is performed with the
+    **CLI client** — it is the only client that holds an admin key.
+
+    [:octicons-arrow-right-24: Installation](install/index.md) ·
+    [Administration](admin/index.md)
+
+-   :material-account: __End users__
+
+    Store and retrieve secrets through the web or command line.
+
+    [:octicons-arrow-right-24: Web client](clients/web.md) ·
+    [CLI client](clients/cli.md)
+
 </div>
 
 ## How Gako is put together
@@ -53,8 +57,12 @@ every client:
 
 - a **server** that stores and serves opaque ciphertext, policy, and signatures;
 - a **web client** (the core compiled to WebAssembly), served by that same binary;
-- a **CLI client** for scripting and machine use.
+- a **CLI client** for scripting, automation, and administration.
 
 The same core enforces the same formats everywhere, so a secret written by one
 client is readable by another. See [Architecture](concepts/architecture.md) for
 the full picture.
+
+Native **desktop and mobile clients** and **browser extensions** are planned and
+will share that same core; until they ship, the web and CLI clients are the two
+ways in.

@@ -10,9 +10,12 @@ conceptual explanation, see the [zero-knowledge model](../concepts/zero-knowledg
 
 ## What the server learns
 
-The server stores opaque ciphertext, access policy, and signatures. It can
-observe metadata — that objects exist, their sizes, and when they change — but
-not the plaintext of any secret, because it never holds the decryption keys.
+The server stores opaque ciphertext, access policy, and signatures. From those it
+necessarily learns **metadata**: that objects exist and roughly how large they
+are (ciphertext is bucketed, not measured exactly), when they are created and
+change, and the **access graph** — which identities may read which objects. What
+it never learns is the **plaintext** of any secret, because it never holds the
+decryption keys.
 
 !!! note "Draft"
     The precise, line-by-line accounting of what the server stores and what it
@@ -22,13 +25,37 @@ not the plaintext of any secret, because it never holds the decryption keys.
 
 ## What Gako does not protect against
 
-- Compromise of a **client device** while unlocked.
-- A phished, guessed, or reused **master credential**.
-- Access granted to the **wrong identity** — policy is enforced exactly as
-  configured.
+Making the server a non-target leaves the endpoints — and the choices operators
+and users make — squarely in scope. Zero-knowledge does nothing for:
+
+- **Compromised client devices.** A device compromised while unlocked exposes
+  whatever it can already decrypt; endpoint hygiene is outside Gako's reach.
+- **Weak or reused master credentials.** A phished, guessed, or reused master
+  password defeats the account it protects. Encourage strong, unique passwords,
+  and treat recovery codes as offline secrets.
+- **Misconfigured access.** Policy is enforced exactly and honestly as
+  configured — granting the wrong identity grants the wrong identity. Review
+  grants and machine scopes.
+
+The [zero-knowledge model](../concepts/zero-knowledge.md) frames the same
+boundary from the user's side.
 
 ## Reporting a vulnerability
 
-!!! note "Draft"
-    The security contact and disclosure process will be published here, mirroring
-    the project's `SECURITY.md`.
+Report suspected vulnerabilities **privately** — please do not open a public issue
+for anything you believe is exploitable. The formal channel is GitHub Security
+Advisories on the source repository, which opens to the public once that
+repository does; until then, contact the maintainer directly.
+
+What to expect for a confirmed report:
+
+- acknowledgement within 7 days;
+- an assessment and remediation plan within 30 days;
+- credit in the release notes, unless you would rather not.
+
+There is no bug-bounty program. Several properties are **documented
+non-guarantees**, not bugs, so it is worth reading the
+[zero-knowledge model](../concepts/zero-knowledge.md) first: the server sees the
+access graph, timing, and ciphertext size buckets; revocation cannot recall
+values already read; and recovery material is, by design, an offline all-powerful
+artifact.
